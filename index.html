@@ -1,0 +1,826 @@
+d<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Simulateur Event-B — Feux de signalisation (Rodin)</title>
+<style>
+  :root{
+    --bg:#0f1420; --panel:#171e2e; --panel2:#1e2740; --line:#2b3652;
+    --txt:#e6ebf5; --muted:#9aa7c2; --green:#2ecc71; --red:#e74c3c;
+    --amber:#f1c40f; --blue:#4d9de0; --accent:#6c8cff;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;font-family:system-ui,Segoe UI,Roboto,sans-serif;background:var(--bg);color:var(--txt);font-size:14px}
+  header{padding:12px 18px;background:linear-gradient(90deg,#141c2e,#1b2440);border-bottom:1px solid var(--line);display:flex;flex-wrap:wrap;align-items:center;gap:14px}
+  header h1{font-size:16px;margin:0;font-weight:600}
+  header .sub{color:var(--muted);font-size:12px}
+  .tag{background:var(--panel2);border:1px solid var(--line);border-radius:6px;padding:3px 8px;font-size:12px;color:var(--muted)}
+  button{font:inherit;cursor:pointer;background:var(--panel2);color:var(--txt);border:1px solid var(--line);border-radius:7px;padding:7px 12px}
+  button:hover{border-color:var(--accent)}
+  button.primary{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:600}
+  button:disabled{opacity:.4;cursor:not-allowed}
+  .wrap{display:grid;grid-template-columns:1.35fr 1fr;gap:14px;padding:14px;align-items:start}
+  @media(max-width:1050px){.wrap{grid-template-columns:1fr}}
+  .page{display:flex;flex-direction:column;gap:14px;padding:14px}
+  .wrap-main{display:grid;grid-template-columns:1.45fr 1fr;gap:14px;align-items:start}
+  @media(max-width:1050px){.wrap-main{grid-template-columns:1fr}}
+  .bottom-panel{margin-top:0}
+  .bottom-panel #panel{max-height:340px;overflow:auto}
+  .right-col{display:flex;flex-direction:column;gap:14px}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px}
+  .card h2{margin:0 0 10px;font-size:13px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted)}
+  .toolbar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:10px}
+  canvas{width:100%;max-width:620px;height:auto;display:block;margin:0 auto;border-radius:12px;background:#26303e}
+  .tabs{display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap}
+  .tabs button{padding:5px 11px;font-size:12px}
+  .tabs button.on{background:var(--accent);border-color:var(--accent);color:#fff}
+  .evt{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:7px 9px;border:1px solid var(--line);border-radius:8px;margin-bottom:6px;background:var(--panel2)}
+  .evt .nm{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:12px}
+  .evt .pill{font-size:10px;color:var(--muted);background:#0d1322;border:1px solid var(--line);border-radius:20px;padding:1px 7px;margin-left:6px}
+  .evt.sensor{border-left:3px solid var(--blue)} .evt.fuzzy{border-left:3px solid var(--amber)}
+  .evt.switch{border-left:3px solid #b06cff} .evt.tick{border-left:3px solid var(--green)}
+  table{width:100%;border-collapse:collapse;font-size:12px}
+  td,th{text-align:left;padding:4px 6px;border-bottom:1px solid var(--line);vertical-align:top}
+  th{color:var(--muted);font-weight:600}
+  .mono{font-family:ui-monospace,Menlo,Consolas,monospace}
+  .inv-ok{color:var(--green)} .inv-bad{color:var(--red);font-weight:700}
+  .inv-row{display:flex;gap:8px;align-items:baseline;padding:3px 0;border-bottom:1px solid var(--line)}
+  .dot{width:9px;height:9px;border-radius:50%;flex:0 0 auto;margin-top:4px}
+  .dot.ok{background:var(--green)} .dot.bad{background:var(--red)}
+  #log{max-height:120px;overflow:auto;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:11px;line-height:1.5}
+  #log div{padding:1px 0;color:var(--muted)} #log b{color:var(--txt)}
+  .banner{padding:8px 12px;border-radius:8px;margin:10px 0;font-size:13px}
+  .banner.ok{background:rgba(46,204,113,.12);border:1px solid rgba(46,204,113,.4)}
+  .banner.bad{background:rgba(231,76,60,.15);border:1px solid rgba(231,76,60,.5);color:#ffd5d0}
+  .phase{display:flex;align-items:center;gap:12px;padding:10px 14px;border-radius:10px;background:var(--panel2);border:1px solid var(--line);margin-bottom:10px}
+  .phase .big{font-size:17px;font-weight:700}
+  .phase .clock{margin-left:auto;font-variant-numeric:tabular-nums;font-size:15px;color:var(--muted)}
+  .lanes{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:12px}
+  .lane{border:1px solid var(--line);border-radius:10px;padding:10px 12px;background:var(--panel2)}
+  .lane .h{display:flex;align-items:center;gap:8px;font-weight:700;margin-bottom:6px}
+  .lane .h .l{width:14px;height:14px;border-radius:50%;box-shadow:0 0 8px currentColor}
+  .lane .row{display:flex;justify-content:space-between;font-size:12.5px;padding:2px 0;border-bottom:1px dashed rgba(255,255,255,.06)}
+  .lane .row span:first-child{color:var(--muted)}
+  .lane .row b{font-weight:600}
+  .row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+  input[type=range]{accent-color:var(--accent)}
+  .hint{color:var(--muted);font-size:11px;margin-top:6px}
+  a{color:var(--accent)}
+  .legend{display:flex;gap:16px;justify-content:center;margin-top:8px;font-size:11px;color:var(--muted);flex-wrap:wrap}
+  .legend i{display:inline-block;width:12px;height:12px;border-radius:3px;vertical-align:-2px;margin-right:4px}
+  .scenario-bar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:10px}
+  .scenario-bar select{flex:1;min-width:200px;background:var(--panel2);color:var(--txt);border:1px solid var(--line);border-radius:7px;padding:7px 10px;font:inherit}
+  .scenario-desc{color:var(--muted);font-size:12px;margin-bottom:10px;line-height:1.45}
+  .metrics-live{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:8px;margin-bottom:12px}
+  .metric-box{background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:10px 12px}
+  .metric-box .lbl{font-size:11px;color:var(--muted);margin-bottom:4px}
+  .metric-box .val{font-size:18px;font-weight:700;font-variant-numeric:tabular-nums}
+  .metric-box .sub{font-size:10px;color:var(--muted);margin-top:2px}
+  .perf-grid{width:100%;font-size:12px}
+  .perf-grid th,.perf-grid td{padding:6px 8px;text-align:right}
+  .perf-grid th:first-child,.perf-grid td:first-child{text-align:left}
+  .perf-grid tr.best td{background:rgba(46,204,113,.08)}
+  .perf-grid tr.current td{font-weight:600}
+  .perf-grid tr.current td:first-child::after{content:' ◀';color:var(--accent);font-size:10px}
+  .perf-actions{display:flex;flex-wrap:wrap;gap:8px;margin:10px 0}
+  .batch-bar{height:6px;background:var(--panel2);border-radius:4px;overflow:hidden;margin:8px 0}
+  .batch-bar i{display:block;height:100%;background:var(--accent);width:0;transition:width .2s}
+</style>
+</head>
+<body>
+<header>
+  <h1>🚦 Simulateur Event-B — Trafic en temps réel</h1>
+  <span class="sub">Scène pilotée par <b>vos fichiers Rodin</b> — feux, voies, véhicules et piétons animés à partir de l'état prouvé</span>
+  <span style="flex:1"></span>
+  <span class="tag" id="srcTag">source : défaut embarqué</span>
+  <label class="tag" style="cursor:pointer">📂 Importer TrafficClean
+    <input id="folder" type="file" webkitdirectory directory multiple style="display:none"/>
+  </label>
+</header>
+
+<div class="page">
+<div class="wrap-main">
+  <!-- GAUCHE : scène + grille + journal -->
+  <div>
+    <div class="card">
+      <div class="tabs" id="machTabs"></div>
+      <div class="phase">
+        <span class="l" id="phaseDot" style="width:14px;height:14px;border-radius:50%;background:#2ecc71"></span>
+        <span class="big" id="phaseTxt">Phase —</span>
+        <span class="clock" id="phaseClock">—</span>
+      </div>
+      <h2 style="margin-top:0">Scénario de trafic</h2>
+      <div class="scenario-bar">
+        <select id="scenarioSel"></select>
+        <button id="btnApplyScenario">Appliquer</button>
+      </div>
+      <div class="scenario-desc" id="scenarioDesc">—</div>
+      <div class="metrics-live" id="metricsLive"></div>
+      <div class="toolbar">
+        <button class="primary" id="btnAuto">▶ Lancer la simulation</button>
+        <button id="btnReset">⟲ Réinitialiser</button>
+        <button id="btnStep">⏭ 1 pas</button>
+        <span class="row"><span class="hint">vitesse</span><input id="speed" type="range" min="0.4" max="3" value="1.1" step="0.1"/></span>
+      </div>
+      <canvas id="scene" width="620" height="620"></canvas>
+      <div class="legend">
+        <span><i style="background:#3aa0ff"></i>véhicules qui passent</span>
+        <span><i style="background:#e8973a"></i>véhicules à l'arrêt</span>
+        <span><i style="background:#f1c40f;border-radius:50%"></i>piétons</span>
+        <span><i style="background:#2ecc71;border-radius:50%"></i>vert</span>
+        <span><i style="background:#e74c3c;border-radius:50%"></i>rouge</span>
+      </div>
+      <div id="invBanner" class="banner ok">Invariants : —</div>
+    </div>
+
+    <div class="card" style="margin-top:14px">
+      <h2>Grille de performance</h2>
+      <div class="hint" style="margin-bottom:8px">Comparaison des scénarios selon le <b>temps d'attente global</b> des véhicules et des piétons (secondes cumulées pendant la simulation).</div>
+      <div class="perf-actions">
+        <button id="btnRecord">📊 Enregistrer ce scénario</button>
+        <button id="btnCompareAll" class="primary">⚡ Comparer tous les scénarios</button>
+        <button id="btnClearGrid">Effacer la grille</button>
+      </div>
+      <div class="batch-bar" id="batchBar" style="display:none"><i id="batchProg"></i></div>
+      <div id="batchStatus" class="hint" style="display:none"></div>
+      <table class="perf-grid" id="perfGrid">
+        <thead><tr>
+          <th>Scénario</th><th>Durée (s)</th>
+          <th>Attente véhicules (total)</th><th>Attente véhicules (moy.)</th>
+          <th>Attente piétons (total)</th><th>Attente piétons (moy.)</th>
+        </tr></thead>
+        <tbody id="perfBody"><tr><td colspan="6" class="hint" style="text-align:center;padding:14px">Lancez une simulation puis enregistrez, ou comparez tous les scénarios automatiquement.</td></tr></tbody>
+      </table>
+    </div>
+
+    <div class="card" style="margin-top:14px">
+      <h2>Journal d'exécution (événements Event-B)</h2>
+      <div id="log"></div>
+    </div>
+  </div>
+
+  <!-- DROITE : statistiques par voie -->
+  <div class="right-col">
+    <div class="card">
+      <h2>Statistiques par voie</h2>
+      <div class="lanes" id="lanes"></div>
+      <div class="hint">Le modèle Rodin actionne une voie représentative par axe (Nord ↔ Sud, Est ↔ Ouest) ; durée de vert et chrono sont partagés par l'axe. Les variables brutes restent visibles dans l'onglet « État brut » en bas.</div>
+    </div>
+  </div>
+</div>
+
+<!-- BAS : panneaux Event-B -->
+<div class="bottom-panel">
+  <div class="card">
+    <div class="tabs" id="panelTabs">
+      <button data-p="events" class="on">Événements activables</button>
+      <button data-p="state">État brut</button>
+      <button data-p="inv">Invariants</button>
+      <button data-p="trace">Trace ProB</button>
+      <button data-p="model">Modèle</button>
+    </div>
+    <div id="panel"></div>
+  </div>
+</div>
+</div>
+
+<script src="model_data.js"></script>
+<script>
+"use strict";
+/* =======================================================================
+   1) MOTEUR D'EXPRESSIONS Event-B  (identique — vérifié conforme à ProB)
+   ======================================================================= */
+const C=v=>({k:'c',v}),I=v=>({k:'i',v}),P=(a,b)=>({k:'p',a,b}),F=m=>({k:'f',m});
+function vkey(v){switch(v.k){case'c':return'c:'+v.v;case'i':return'i:'+v.v;
+  case'p':return'p('+vkey(v.a)+'↦'+vkey(v.b)+')';
+  case'f':{const e=[...v.m.entries()].sort((x,y)=>x[0]<y[0]?-1:1);return'f{'+e.map(([k,val])=>k+'='+vkey(val)).join(',')+'}';}}}
+function veq(a,b){return vkey(a)===vkey(b);}
+function vshow(v){switch(v.k){case'c':return v.v;case'i':return''+v.v;
+  case'p':return vshow(v.a)+'↦'+vshow(v.b);
+  case'f':{return'{'+[...v.m.entries()].map(([k,val])=>k.replace(/^c:/,'')+'↦'+vshow(val)).join(', ')+'}';}}}
+const SYM=['≔','∈','↦','≠','⇒','∧','∨','¬','≤','≥','×','→','·','∀','∃','=','<','>','+','-','(',')','{','}',','];
+function tokenize(s){const t=[];let i=0;while(i<s.length){const ch=s[i];
+  if(/\s/.test(ch)){i++;continue;}if(ch==='ℕ'){t.push({t:'NAT'});i++;continue;}
+  let sym=SYM.find(x=>s.startsWith(x,i));if(sym){t.push({t:sym});i+=sym.length;continue;}
+  if(/[0-9]/.test(ch)){let j=i;while(j<s.length&&/[0-9]/.test(s[j]))j++;t.push({t:'num',v:parseInt(s.slice(i,j),10)});i=j;continue;}
+  if(/[A-Za-z_]/.test(ch)){let j=i;while(j<s.length&&/[A-Za-z0-9_]/.test(s[j]))j++;t.push({t:'id',v:s.slice(i,j)});i=j;continue;}
+  throw new Error('car? '+ch);}t.push({t:'EOF'});return t;}
+function Parser(tokens){let p=0;const peek=()=>tokens[p],next=()=>tokens[p++];
+  const eat=t=>{if(peek().t!==t)throw new Error('attendu '+t);return next();};
+  function pred(){return impl();}
+  function impl(){let l=disj();if(peek().t==='⇒'){next();return{t:'impl',l,r:impl()};}return l;}
+  function disj(){let l=conj();while(peek().t==='∨'){next();l={t:'or',l,r:conj()};}return l;}
+  function conj(){let l=unary();while(peek().t==='∧'){next();l={t:'and',l,r:unary()};}return l;}
+  function unary(){if(peek().t==='¬'){next();return{t:'not',e:unary()};}
+    if(peek().t==='∀'||peek().t==='∃'){const q=next().t;const v=eat('id').v;eat('·');return{t:q==='∀'?'forall':'exists',v,body:pred()};}return comp();}
+  function comp(){let l=maplet();const op=peek().t;
+    if(['=','≠','≤','≥','<','>','∈'].includes(op)){next();const r=maplet();
+      const m={'=':'eq','≠':'ne','≤':'le','≥':'ge','<':'lt','>':'gt','∈':'in'}[op];return{t:m,l,r};}return l;}
+  function maplet(){let l=arrow();while(peek().t==='↦'){next();l={t:'maplet',l,r:arrow()};}return l;}
+  function arrow(){let l=add();while(peek().t==='→'||peek().t==='×'){const op=next().t;l={t:op==='→'?'tfun':'prod',l,r:add()};}return l;}
+  function add(){let l=app();while(peek().t==='+'||peek().t==='-'){const op=next().t;l={t:op==='+'?'add':'sub',l,r:app()};}return l;}
+  function app(){let l=atom();while(peek().t==='('){next();const arg=maplet();eat(')');l={t:'app',f:l,arg};}return l;}
+  function atom(){const tk=peek();
+    if(tk.t==='('){next();const e=pred();eat(')');return e;}
+    if(tk.t==='{'){next();const elems=[];if(peek().t!=='}'){elems.push(maplet());while(peek().t===','){next();elems.push(maplet());}}eat('}');return{t:'set',elems};}
+    if(tk.t==='NAT'){next();return{t:'nat'};}
+    if(tk.t==='num'){next();return{t:'num',v:tk.v};}
+    if(tk.t==='id'){next();return{t:'id',v:tk.v};}
+    throw new Error('atome? '+JSON.stringify(tk));}
+  const r=pred();if(peek().t!=='EOF')throw new Error('reste '+JSON.stringify(peek()));return r;}
+const pcache={};function parse(s){if(!(s in pcache))pcache[s]=Parser(tokenize(s));return pcache[s];}
+function SetObj(contains,elems){return{contains,elems};}
+function asSet(v){if(v.set)return v.set;throw new Error('ensemble?');}
+function evalExpr(node,env){switch(node.t){
+  case'num':return I(node.v);case'nat':return{set:SetObj(v=>v.k==='i'&&v.v>=0)};
+  case'id':{const n=node.v;if(env.bound&&n in env.bound)return env.bound[n];
+    if(env.state&&n in env.state)return env.state[n];if(env.numConsts&&n in env.numConsts)return I(env.numConsts[n]);
+    if(env.sets&&env.sets[n])return{set:env.sets[n]};if(env.enums.has(n))return C(n);throw new Error('id? '+n);}
+  case'maplet':return P(evalExpr(node.l,env),evalExpr(node.r,env));
+  case'add':return I(evalExpr(node.l,env).v+evalExpr(node.r,env).v);
+  case'sub':return I(evalExpr(node.l,env).v-evalExpr(node.r,env).v);
+  case'app':{const f=evalExpr(node.f,env),a=evalExpr(node.arg,env);if(f.k!=='f')throw new Error('app?');
+    const r=f.m.get(vkey(a));if(r===undefined)throw new Error('hors domaine');return r;}
+  case'set':{if(node.elems.length&&node.elems.every(e=>e.t==='maplet')){const m=new Map();
+      for(const e of node.elems){const a=evalExpr(e.l,env),b=evalExpr(e.r,env);m.set(vkey(a),b);}return F(m);}
+    const els=node.elems.map(e=>evalExpr(e,env));return{set:SetObj(v=>els.some(x=>veq(x,v)),els)};}
+  case'prod':{const A=asSet(evalExpr(node.l,env)),B=asSet(evalExpr(node.r,env));const elems=[];
+    if(A.elems&&B.elems)for(const a of A.elems)for(const b of B.elems)elems.push(P(a,b));
+    return{set:SetObj(v=>v.k==='p'&&A.contains(v.a)&&B.contains(v.b),elems)};}
+  case'tfun':{const A=asSet(evalExpr(node.l,env)),B=asSet(evalExpr(node.r,env));
+    return{set:SetObj(v=>{if(v.k!=='f')return false;if(!A.elems)return false;if(v.m.size!==A.elems.length)return false;
+      for(const a of A.elems){const img=v.m.get(vkey(a));if(img===undefined||!B.contains(img))return false;}return true;})};}
+  default:throw new Error('val? '+node.t);}}
+function evalPred(node,env){switch(node.t){
+  case'impl':return(!evalPred(node.l,env))||evalPred(node.r,env);
+  case'or':return evalPred(node.l,env)||evalPred(node.r,env);
+  case'and':return evalPred(node.l,env)&&evalPred(node.r,env);
+  case'not':return!evalPred(node.e,env);
+  case'eq':return veq(evalExpr(node.l,env),evalExpr(node.r,env));
+  case'ne':return!veq(evalExpr(node.l,env),evalExpr(node.r,env));
+  case'le':return evalExpr(node.l,env).v<=evalExpr(node.r,env).v;
+  case'ge':return evalExpr(node.l,env).v>=evalExpr(node.r,env).v;
+  case'lt':return evalExpr(node.l,env).v<evalExpr(node.r,env).v;
+  case'gt':return evalExpr(node.l,env).v>evalExpr(node.r,env).v;
+  case'in':return asSet(evalExpr(node.r,env)).contains(evalExpr(node.l,env));
+  case'forall':{for(const el of env.universe){const e2={...env,bound:{...env.bound,[node.v]:el}};if(!evalPred(node.body,e2))return false;}return true;}
+  case'exists':{for(const el of env.universe){const e2={...env,bound:{...env.bound,[node.v]:el}};if(evalPred(node.body,e2))return true;}return false;}
+  default:throw new Error('pred? '+node.t);}}
+function parseRodin(files){const dp=new DOMParser();const ctx={},mac={};
+  for(const[fn,txt]of Object.entries(files)){const doc=dp.parseFromString(txt,'application/xml');
+    if(doc.querySelector('parsererror'))throw new Error('XML illisible: '+fn);const root=doc.documentElement;const name=fn.replace(/\.(buc|bum)$/,'');
+    if(fn.endsWith('.buc')){const o={name,sets:[],consts:[],axioms:[],extends:[]};
+      for(const e of root.children){const tag=e.tagName;const id=e.getAttribute('org.eventb.core.identifier');
+        const pred=e.getAttribute('org.eventb.core.predicate');const tgt=e.getAttribute('org.eventb.core.target');
+        if(tag.includes('carrierSet'))o.sets.push(id);else if(tag.includes('constant'))o.consts.push(id);
+        else if(tag.includes('axiom'))o.axioms.push(pred);else if(tag.includes('extendsContext'))o.extends.push(tgt);}
+      ctx[name]=o;}
+    else{const o={name,sees:[],refines:null,vars:[],invs:[],events:[]};
+      for(const e of root.children){const tag=e.tagName;
+        if(tag.includes('seesContext'))o.sees.push(e.getAttribute('org.eventb.core.target'));
+        else if(tag.includes('refinesMachine'))o.refines=e.getAttribute('org.eventb.core.target');
+        else if(tag.includes('variable'))o.vars.push(e.getAttribute('org.eventb.core.identifier'));
+        else if(tag.includes('invariant'))o.invs.push({label:e.getAttribute('org.eventb.core.label'),pred:e.getAttribute('org.eventb.core.predicate')});
+        else if(tag.includes('.event')){const ev={label:e.getAttribute('org.eventb.core.label'),
+          extended:e.getAttribute('org.eventb.core.extended')==='true',refines:null,params:[],guards:[],actions:[]};
+          for(const c of e.children){const ct=c.tagName;
+            if(ct.includes('refinesEvent'))ev.refines=c.getAttribute('org.eventb.core.target');
+            else if(ct.includes('parameter'))ev.params.push(c.getAttribute('org.eventb.core.identifier'));
+            else if(ct.includes('guard'))ev.guards.push(c.getAttribute('org.eventb.core.predicate'));
+            else if(ct.includes('action'))ev.actions.push({label:c.getAttribute('org.eventb.core.label'),asg:c.getAttribute('org.eventb.core.assignment')});}
+          o.events.push(ev);}}
+      mac[name]=o;}}
+  return{ctx,mac};}
+function buildContextEnv(ctxName,ctx){const sets={},enums=new Set(),numConsts={},allElems=[];const seen=new Set();
+  function visit(nm){if(!nm||seen.has(nm)||!ctx[nm])return;seen.add(nm);for(const p of ctx[nm].extends)visit(p);
+    for(const ax of ctx[nm].axioms){let m=ax.match(/^\s*partition\(\s*([A-Za-z0-9_]+)\s*,(.*)\)\s*$/s);
+      if(m){const setName=m[1];const els=[...m[2].matchAll(/\{\s*([A-Za-z0-9_]+)\s*\}/g)].map(x=>x[1]);
+        els.forEach(e=>{enums.add(e);if(!allElems.some(v=>v.v===e))allElems.push(C(e));});
+        sets[setName]=SetObj(v=>v.k==='c'&&els.includes(v.v),els.map(C));continue;}
+      m=ax.match(/^\s*([A-Za-z0-9_]+)\s*=\s*([0-9]+)\s*$/);if(m){numConsts[m[1]]=parseInt(m[2],10);continue;}}}
+  visit(ctxName);return{sets,enums,numConsts,allElems};}
+function flattenMachine(macName,mac){const m=mac[macName];let abstract=null;
+  if(m.refines)abstract=flattenMachine(m.refines,mac);const absEvents={};if(abstract)for(const ev of abstract.events)absEvents[ev.label]=ev;
+  const vars=[...new Set([...(abstract?abstract.vars:[]),...m.vars])];const invs=[...(abstract?abstract.invs:[]),...m.invs];
+  const events=[];const done=new Set();
+  for(const ev of m.events){let base={params:[],guards:[],actions:[]};
+    if(ev.label==='INITIALISATION'&&absEvents['INITIALISATION'])base=absEvents['INITIALISATION'];
+    else if(ev.extended&&ev.refines&&absEvents[ev.refines])base=absEvents[ev.refines];
+    events.push({label:ev.label,params:[...base.params,...ev.params],guards:[...base.guards,...ev.guards],actions:[...base.actions,...ev.actions]});
+    done.add(ev.label);if(ev.refines)done.add(ev.refines);}
+  if(abstract)for(const ev of abstract.events)if(!done.has(ev.label))events.push(ev);
+  return{name:macName,sees:m.sees,refines:m.refines,vars,invs,events};}
+function Simulator(macName,ctx,mac){const flat=flattenMachine(macName,mac);
+  let sets={},enums=new Set(),numConsts={},allElems=[];
+  for(const cn of flat.sees){const ce=buildContextEnv(cn,ctx);Object.assign(sets,ce.sets);ce.enums.forEach(e=>enums.add(e));
+    Object.assign(numConsts,ce.numConsts);ce.allElems.forEach(v=>{if(!allElems.some(x=>x.v===v.v))allElems.push(v);});}
+  const baseEnv={sets,enums,numConsts,universe:allElems,bound:{}};
+  const init=flat.events.find(e=>e.label==='INITIALISATION');
+  const properEvents=flat.events.filter(e=>e.label!=='INITIALISATION');let state={};
+  function env(b){return{...baseEnv,state,bound:b||{}};}
+  function splitAssign(a){const i=a.indexOf('≔');return[a.slice(0,i).trim(),a.slice(i+1).trim()];}
+  function applyActions(actions,bound){const ups=[];
+    for(const a of actions){const[lhs,rhs]=splitAssign(a.asg);const val=evalExpr(parse(rhs),env(bound));const lt=parse(lhs);
+      if(lt.t==='id')ups.push(()=>{state[lt.v]=val;});
+      else if(lt.t==='app'){const fn=lt.f.v;const key=vkey(evalExpr(lt.arg,env(bound)));ups.push(()=>{const nf=new Map(state[fn].m);nf.set(key,val);state[fn]=F(nf);});}
+      else throw new Error('LHS?');}ups.forEach(u=>u());}
+  function reset(){state={};applyActions(init.actions,{});}
+  function paramDomain(ev,p){for(const g of ev.guards){try{const n=parse(g);
+    if(n.t==='in'&&n.l.t==='id'&&n.l.v===p)return asSet(evalExpr(n.r,env({}))).elems||[];}catch(e){}}return[];}
+  function enabled(){const res=[];for(const ev of properEvents){let combos=[{}],ok=true;
+    for(const p of ev.params){const dom=paramDomain(ev,p);if(!dom.length){ok=false;break;}
+      const nc=[];for(const c of combos)for(const d of dom)nc.push({...c,[p]:d});combos=nc;}
+    if(!ok)continue;for(const b of combos){let all=true;for(const g of ev.guards){if(!evalPred(parse(g),env(b))){all=false;break;}}if(all)res.push({ev,bound:b});}}return res;}
+  function fire(t){applyActions(t.ev.actions,t.bound);}
+  function checkInvariants(){const out=[];for(const inv of flat.invs){let ok=true;try{ok=evalPred(parse(inv.pred),env({}));}catch(e){ok=null;}out.push({label:inv.label,pred:inv.pred,ok});}return out;}
+  return{flat,reset,enabled,fire,checkInvariants,getState:()=>state,setState:s=>{state=s;},
+         vars:flat.vars,invs:flat.invs,events:properEvents,sets,numConsts};}
+
+/* =======================================================================
+   2b) SCÉNARIOS DE TRAFIC + MÉTRIQUES DE PERFORMANCE
+   ======================================================================= */
+const SCENARIOS={
+  balanced:{id:'balanced',name:'Trafic équilibré',desc:'Densité modérée et piétons peu nombreux sur les 4 approches.',
+    density:{NORTH:1,SOUTH:1,EAST:1,WEST:1},ped:{NORTH:1,SOUTH:1,EAST:1,WEST:1}},
+  heavy_ns:{id:'heavy_ns',name:'Axe Nord–Sud chargé',desc:'Fort trafic sur Nord et Sud, faible sur Est et Ouest (scénario asymétrique).',
+    density:{NORTH:0.32,SOUTH:0.32,EAST:2.8,WEST:2.8},ped:{NORTH:1,SOUTH:1,EAST:1,WEST:1}},
+  heavy_ew:{id:'heavy_ew',name:'Axe Est–Ouest chargé',desc:'Fort trafic sur Est et Ouest, faible sur Nord et Sud.',
+    density:{NORTH:2.8,SOUTH:2.8,EAST:0.32,WEST:0.32},ped:{NORTH:1,SOUTH:1,EAST:1,WEST:1}},
+  many_peds:{id:'many_peds',name:'Piétons nombreux',desc:'Trafic modéré mais forte affluence piétonne sur toutes les approches.',
+    density:{NORTH:1,SOUTH:1,EAST:1,WEST:1},ped:{NORTH:0.45,SOUTH:0.45,EAST:0.45,WEST:0.45}},
+  rush_hour:{id:'rush_hour',name:'Heure de pointe',desc:'Trafic dense partout avec piétons nombreux — stress maximal du carrefour.',
+    density:{NORTH:0.45,SOUTH:0.45,EAST:0.45,WEST:0.45},ped:{NORTH:0.5,SOUTH:0.5,EAST:0.5,WEST:0.5}},
+  light_traffic:{id:'light_traffic',name:'Trafic faible',desc:'Peu de véhicules et peu de piétons — référence de charge minimale.',
+    density:{NORTH:3.2,SOUTH:3.2,EAST:3.2,WEST:3.2},ped:{NORTH:2.5,SOUTH:2.5,EAST:2.5,WEST:2.5}},
+};
+let curScenario='balanced', scenarioResults={}, batchMode=null;
+const metrics={simTime:0,vehicleWaitTotal:0,pedWaitTotal:0,vehiclesSpawned:0,pedsSpawned:0};
+function resetMetrics(){metrics.simTime=0;metrics.vehicleWaitTotal=0;metrics.pedWaitTotal=0;metrics.vehiclesSpawned=0;metrics.pedsSpawned=0;}
+function scenarioCfg(){return SCENARIOS[curScenario]||SCENARIOS.balanced;}
+function pedInterval(st,lane){const p=pairOf(st,'nb_pedestrians',lane);
+  const many=p&&p[1]==='MANY';const base=many?1.1:2.6;
+  const mult=(scenarioCfg().ped[lane]||1);return base*mult;}
+function waitingPedCount(st,lane,ph){let n=0;
+  for(const pd of peds)if(pd.appr===lane&&(pd.t<0.04||(pd.t<0.96&&!pedCanAdvance(pd))))n++;
+  if(ph[lane]==='red'&&!laneCrosswalkBlockedByCars(lane)){const p=pairOf(st,'nb_pedestrians',lane);n+=p&&p[1]==='MANY'?4:2;}
+  return n;}
+function recordMetrics(dt,ph){const st=sim.getState();metrics.simTime+=dt;
+  for(const lane of LANES){metrics.vehicleWaitTotal+=dt*queueCount(lane);
+    metrics.pedWaitTotal+=dt*waitingPedCount(st,lane,ph);}}
+function fmtSec(s){return s<10?s.toFixed(2):s<100?s.toFixed(1):Math.round(s).toLocaleString('fr-FR');}
+function snapshotMetrics(){return{simTime:metrics.simTime,vehicleWaitTotal:metrics.vehicleWaitTotal,pedWaitTotal:metrics.pedWaitTotal,
+  vehiclesSpawned:metrics.vehiclesSpawned,pedsSpawned:metrics.pedsSpawned,
+  avgVehicleWait:metrics.vehiclesSpawned?metrics.vehicleWaitTotal/metrics.vehiclesSpawned:0,
+  avgPedWait:metrics.pedsSpawned?metrics.pedWaitTotal/metrics.pedsSpawned:0};}
+function updateMetricsLive(){const m=snapshotMetrics();
+  document.getElementById('metricsLive').innerHTML=
+    `<div class="metric-box"><div class="lbl">Temps simulé</div><div class="val">${fmtSec(m.simTime)} s</div></div>
+     <div class="metric-box"><div class="lbl">Attente véhicules (global)</div><div class="val">${fmtSec(m.vehicleWaitTotal)} s</div><div class="sub">moy. ${fmtSec(m.avgVehicleWait)} s/véh.</div></div>
+     <div class="metric-box"><div class="lbl">Attente piétons (global)</div><div class="val">${fmtSec(m.pedWaitTotal)} s</div><div class="sub">moy. ${fmtSec(m.avgPedWait)} s/piéton</div></div>
+     <div class="metric-box"><div class="lbl">Entités</div><div class="val">${m.vehiclesSpawned} / ${m.pedsSpawned}</div><div class="sub">véhicules / piétons</div></div>`;}
+function renderPerfGrid(){const body=document.getElementById('perfBody');
+  const keys=Object.keys(SCENARIOS).filter(id=>id in scenarioResults);
+  if(!keys.length){body.innerHTML='<tr><td colspan="6" class="hint" style="text-align:center;padding:14px">Lancez une simulation puis enregistrez, ou comparez tous les scénarios automatiquement.</td></tr>';return;}
+  const minV=Math.min(...keys.map(k=>scenarioResults[k].vehicleWaitTotal));
+  const minP=Math.min(...keys.map(k=>scenarioResults[k].pedWaitTotal));
+  body.innerHTML=keys.map(id=>{const r=scenarioResults[id],sc=SCENARIOS[id];
+    const best=r.vehicleWaitTotal===minV&&r.pedWaitTotal===minP;const cur=id===curScenario;
+    return`<tr class="${best?'best':''} ${cur?'current':''}"><td>${sc?sc.name:id}</td><td>${fmtSec(r.simTime)}</td>
+      <td>${fmtSec(r.vehicleWaitTotal)}</td><td>${fmtSec(r.avgVehicleWait)}</td>
+      <td>${fmtSec(r.pedWaitTotal)}</td><td>${fmtSec(r.avgPedWait)}</td></tr>`;}).join('');}
+function initScenarioUI(){const sel=document.getElementById('scenarioSel');sel.innerHTML='';
+  for(const id of Object.keys(SCENARIOS)){const s=SCENARIOS[id];const o=document.createElement('option');
+    o.value=id;o.textContent=s.name;sel.appendChild(o);}
+  sel.value=curScenario;updateScenarioDesc();
+  sel.onchange=()=>{curScenario=sel.value;updateScenarioDesc();};
+  document.getElementById('btnApplyScenario').onclick=applyScenario;
+  document.getElementById('btnRecord').onclick=()=>{scenarioResults[curScenario]=snapshotMetrics();renderPerfGrid();log('📊 Résultat enregistré pour <b>'+SCENARIOS[curScenario].name+'</b>');};
+  document.getElementById('btnCompareAll').onclick=startBatchCompare;
+  document.getElementById('btnClearGrid').onclick=()=>{scenarioResults={};renderPerfGrid();log('Grille de performance effacée.');};}
+function updateScenarioDesc(){document.getElementById('scenarioDesc').textContent=scenarioCfg().desc;}
+function applyScenario(){autoOn=false;setAutoBtn();sim.reset();cars=[];peds=[];spawnAcc={NORTH:0,SOUTH:0,EAST:0,WEST:0};
+  pedAcc={NORTH:0,SOUTH:0,EAST:0,WEST:0};resetMetrics();phaseClock=0;phaseTarget=computeTarget();
+  log('Scénario <b>'+SCENARIOS[curScenario].name+'</b> appliqué');refreshPanels();updateLaneCards();updatePhaseBar();updateMetricsLive();}
+const BATCH_DURATION=45;
+function startBatchCompare(){if(batchMode)return;batchMode={idx:0,elapsed:0,ids:Object.keys(SCENARIOS)};
+  autoOn=true;setAutoBtn();speed=2.5;document.getElementById('speed').value='2.5';
+  document.getElementById('batchBar').style.display='block';document.getElementById('batchStatus').style.display='block';
+  runBatchStep();}
+function runBatchStep(){if(!batchMode)return;const ids=batchMode.ids;
+  if(batchMode.idx>=ids.length){finishBatch();return;}
+  curScenario=ids[batchMode.idx];document.getElementById('scenarioSel').value=curScenario;updateScenarioDesc();
+  applyScenario();autoOn=true;setAutoBtn();batchMode.elapsed=0;
+  document.getElementById('batchStatus').textContent='Scénario '+(batchMode.idx+1)+'/'+ids.length+' : '+SCENARIOS[curScenario].name+'…';}
+function tickBatch(dt){if(!batchMode)return;batchMode.elapsed+=dt;
+  const pct=((batchMode.idx+batchMode.elapsed/BATCH_DURATION)/batchMode.ids.length)*100;
+  document.getElementById('batchProg').style.width=pct+'%';
+  if(batchMode.elapsed>=BATCH_DURATION){scenarioResults[curScenario]=snapshotMetrics();batchMode.idx++;runBatchStep();}}
+function finishBatch(){batchMode=null;autoOn=false;setAutoBtn();renderPerfGrid();
+  document.getElementById('batchBar').style.display='none';document.getElementById('batchStatus').style.display='none';
+  document.getElementById('batchStatus').textContent='';log('<b>Comparaison terminée</b> — '+Object.keys(scenarioResults).length+' scénarios dans la grille.');}
+
+/* =======================================================================
+   2) VERBALISATION (état symbolique -> français)
+   ======================================================================= */
+const VB={
+  hedge:{VERY:'très ',QUITE:'assez ',PRECISE:'',TOO:'trop '},
+  dens:{HIGH:'élevé',MODERATE:'modéré',LOW:'faible',VERY_LOW:'très faible',IMPORTANT:'important'},
+  dur:{LONG:'longue',MEDIUM_DUR:'moyenne',SHORT:'courte',MINIMAL:'minimale'},
+  durSec:{LONG:120,MEDIUM_DUR:60,SHORT:30,MINIMAL:10},
+  ped:{MANY:'nombreux',FEW:'peu'},
+  prio:{HIGH_PRIO:'élevée',MODERATE_PRIO:'modérée',LOW_PRIO:'faible'},
+};
+const cap=s=>s?s.charAt(0).toUpperCase()+s.slice(1):s;
+function pairOf(st,fn,lane){const v=st[fn]&&st[fn].m.get('c:'+lane);return v&&v.k==='p'?[v.a.v,v.b.v]:null;}
+function densTxt(st,fn,lane){const p=pairOf(st,fn,lane);if(!p)return'—';return cap((VB.hedge[p[0]]||'')+(VB.dens[p[1]]||p[1]));}
+function durInfo(st,lane){const p=pairOf(st,'green_duration',lane);if(!p)return{txt:'—',sec:0};
+  return{txt:cap(VB.dur[p[1]]||p[1]),sec:VB.durSec[p[1]]||0,lvl:p[1]};}
+function pedTxt(st,lane){const p=pairOf(st,'nb_pedestrians',lane);return p?cap(VB.ped[p[1]]||p[1]):'—';}
+function prioTxt(st,lane){const p=pairOf(st,'lane_priority',lane);return p?cap(VB.prio[p[1]]||p[1]):'—';}
+function waitTxt(st,lane){const p=pairOf(st,'waiting_time',lane);if(!p)return'—';
+  if(p[0]==='TOO'&&p[1]==='IMPORTANT')return'⚠ Trop importante';return cap((VB.hedge[p[0]]||'')+(VB.dens[p[1]]||p[1]));}
+function isGreen(st,lane){const v=st.light_state&&st.light_state.m.get('c:'+lane);return v&&v.v==='GREEN';}
+function timerOf(st,lane){const v=st.timer&&st.timer.m.get('c:'+lane);return v?v.v:null;}
+
+/* =======================================================================
+   3) SCÈNE ANIMÉE (canvas) — pilotée par l'état du modèle
+   ======================================================================= */
+const LANES=['NORTH','SOUTH','EAST','WEST'];
+const FR={NORTH:'Nord',SOUTH:'Sud',EAST:'Est',WEST:'Ouest'};
+const S=620, cx=S/2, cy=S/2, HALF=66, LANE=32;
+const CARLEN=30, CARHALF=15, CARW=15, GAP=10, VMAX=105;
+// axis:'v'/'h' ; dir:+1/-1 ; laneC: coord fixe de la voie ; spawn/stop/end en coord de déplacement
+const APP={
+  NORTH:{axis:'v',dir:+1,laneC:cx-LANE, spawn:-40, stop:cy-HALF, end:S+40, cross:cy-HALF-13, corner:[cx-HALF,cy-HALF]},
+  SOUTH:{axis:'v',dir:-1,laneC:cx+LANE, spawn:S+40, stop:cy+HALF, end:-40, cross:cy+HALF+13, corner:[cx+HALF,cy+HALF]},
+  EAST :{axis:'h',dir:-1,laneC:cy-LANE, spawn:S+40, stop:cx+HALF, end:-40, cross:cx+HALF+13, corner:[cx+HALF,cy-HALF]},
+  WEST :{axis:'h',dir:+1,laneC:cy+LANE, spawn:-40, stop:cx-HALF, end:S+40, cross:cx-HALF-13, corner:[cx-HALF,cy+HALF]},
+};
+let cars=[], peds=[], spawnAcc={NORTH:0,SOUTH:0,EAST:0,WEST:0}, pedAcc={NORTH:0,SOUTH:0,EAST:0,WEST:0};
+// Le modèle n'actionne qu'une voie par axe : Sud partage la phase de Nord, Ouest celle d'Est.
+function repOf(l){return (l==='NORTH'||l==='SOUTH')?'NORTH':'EAST';}
+function lanePhaseGreen(l){return isGreen(sim.getState(),repOf(l));}
+const CARCOLORS=['#3aa0ff','#e6e9ef','#8fa3bf','#ffb84d','#7ed3c4','#c98bdb'];
+let canvas, ctx2d, DPR=1;
+
+function scenePhase(){ // 'green'/'amber'/'red' par approche (amber cosmétique en fin de phase auto)
+  const ph={};
+  for(const l of LANES){
+    let s = lanePhaseGreen(l)?'green':'red';
+    if(s==='green' && autoOn && phaseClock>Math.max(2.5,phaseTarget-0.9)) s='amber';
+    ph[l]=s;
+  }
+  return ph;
+}
+function densInterval(st,lane){const p=pairOf(st,'traffic_density',lane);const lvl=p?p[1]:'LOW';
+  const base={HIGH:0.7,IMPORTANT:0.75,MODERATE:1.2,LOW:2.1,VERY_LOW:3.6}[lvl]||2.1;
+  return base*(scenarioCfg().density[lane]||1);}
+function queueCount(lane){const a=APP[lane];const lim=holdLimitS(lane);let n=0;for(const c of cars){if(c.appr!==lane)continue;
+  const front=c.s+CARHALF; if(front <= lim+4) n++;}return n;}
+
+const CROSS_HALF=14;
+function carAxisRange(c){const a=APP[c.appr];const coord=a.dir*c.s;return{lo:coord-CARHALF,hi:coord+CARHALF};}
+function crossBand(lane){const a=APP[lane];return{lo:a.cross-CROSS_HALF,hi:a.cross+CROSS_HALF};}
+function rangesOverlap(a,b){return a.hi>b.lo && a.lo<b.hi;}
+function carFrontCoord(c){const a=APP[c.appr];return a.dir*(c.s+CARHALF);}
+function carFrontInCrosswalk(c){const f=carFrontCoord(c),b=crossBand(c.appr);return f>b.lo && f<b.hi;}
+function carBodyInCrosswalk(c){return rangesOverlap(carAxisRange(c),crossBand(c.appr));}
+function carClearedStop(c){const a=APP[c.appr];return(c.s+CARHALF)>a.dir*a.stop;}
+function carInIntersection(c){return carClearedStop(c);}
+// limite d'arrêt : pare-chocs avant le passage piéton (aucun chevauchement)
+function holdLimitS(lane){const a=APP[lane],b=crossBand(lane);
+  const frontCoord=a.dir>0?b.lo-4:b.hi+4;return a.dir*frontCoord-CARHALF;}
+function mayEnterLane(c,ph,yieldPeds){return ph[c.appr]==='green'&&!yieldPeds;}
+function pedXY(pd){const a=APP[pd.appr];
+  if(a.axis==='v'){const x=pd.side>0?(cx-HALF+8+pd.t*(HALF*2-16)):(cx+HALF-8-pd.t*(HALF*2-16));return{x,y:a.cross};}
+  const y=pd.side>0?(cy-HALF+8+pd.t*(HALF*2-16)):(cy+HALF-8-pd.t*(HALF*2-16));return{x:a.cross,y};}
+function pedCarConflict(pd,c){if(pd.appr!==c.appr||pd.t<=0.02||pd.t>=0.98)return false;
+  if(!carBodyInCrosswalk(c)&&!carFrontInCrosswalk(c))return false;
+  const p=pedXY(pd),a=APP[c.appr];
+  const lat=a.axis==='v'?Math.abs(p.x-a.laneC):Math.abs(p.y-a.laneC);return lat<CARW/2+10;}
+function laneHasCrossingPeds(lane){for(const pd of peds)if(pd.appr===lane&&pd.t>0.05&&pd.t<0.95)return true;return false;}
+function laneCrosswalkBlockedByCars(lane){for(const c of cars)if(c.appr===lane&&carFrontInCrosswalk(c))return true;return false;}
+function canSpawnPed(lane,ph){return ph[lane]==='red'&&!laneCrosswalkBlockedByCars(lane);}
+function pedCanAdvance(pd){for(const c of cars){
+  if(c.appr===pd.appr&&carFrontInCrosswalk(c))return false;
+  if(pedCarConflict(pd,c))return false;}return true;}
+function laneMustYield(lane){return laneHasCrossingPeds(lane);}
+
+function spawnCar(lane){const a=APP[lane];const spawnS=a.dir*a.spawn;
+  // place derrière le dernier véhicule
+  let minS=Infinity;for(const c of cars)if(c.appr===lane)minS=Math.min(minS,c.s);
+  if(minS-spawnS < CARLEN+GAP+2) return; // pas de place
+  cars.push({appr:lane,s:spawnS,color:CARCOLORS[(Math.random()*CARCOLORS.length)|0],moving:false});
+  metrics.vehiclesSpawned++;}
+function updateCars(dt,ph){
+  const st=sim.getState();
+  for(const lane of LANES){
+    spawnAcc[lane]+=dt;
+    const itv=densInterval(st,lane);
+    if(spawnAcc[lane]>=itv){spawnAcc[lane]=0;spawnCar(lane);}
+  }
+  for(const lane of LANES){
+    const holdS=holdLimitS(lane);
+    const yieldPeds=laneMustYield(lane);
+    const list=cars.filter(c=>c.appr===lane).sort((x,y)=>y.s-x.s);
+    let aheadS=Infinity;
+    for(const c of list){
+      const inBox=carInIntersection(c);
+      let next=c.s+VMAX*dt;
+      next=Math.min(next,aheadS-CARLEN-GAP);
+      if(!inBox){
+        if(!mayEnterLane(c,ph,yieldPeds)) next=Math.min(next,holdS);
+      }
+      const queueCap=aheadS-CARLEN-GAP;
+      if(next>queueCap)next=queueCap;
+      c.s=next;
+      aheadS=c.s;
+    }
+  }
+  cars=cars.filter(c=>{const a=APP[c.appr];return c.s<=a.dir*a.end;});
+}
+function updatePeds(dt,ph){
+  const st=sim.getState();
+  for(const lane of LANES){
+    if(ph[lane]==='red'){
+      pedAcc[lane]+=dt; const itv=pedInterval(st,lane);
+      if(pedAcc[lane]>=itv&&!laneCrosswalkBlockedByCars(lane)){
+        pedAcc[lane]=0; peds.push({appr:lane,t:0,side:Math.random()<.5?1:-1});metrics.pedsSpawned++;
+      }
+    } else pedAcc[lane]=0;
+  }
+  for(const pd of peds){if(pd.t<1&&pedCanAdvance(pd))pd.t+=dt*0.35;}
+  peds=peds.filter(p=>p.t<1);
+}
+
+function drawRoundRect(g,x,y,w,h,r){g.beginPath();g.moveTo(x+r,y);g.arcTo(x+w,y,x+w,y+h,r);g.arcTo(x+w,y+h,x,y+h,r);g.arcTo(x,y+h,x,y,r);g.arcTo(x,y,x+w,y,r);g.closePath();}
+function render(){
+  const g=ctx2d; g.clearRect(0,0,S,S);
+  // gazon
+  g.fillStyle='#26332a'; g.fillRect(0,0,S,S);
+  // routes
+  g.fillStyle='#39414d';
+  g.fillRect(cx-HALF,0,HALF*2,S); g.fillRect(0,cy-HALF,S,HALF*2);
+  g.fillStyle='#424b59'; g.fillRect(cx-HALF,cy-HALF,HALF*2,HALF*2);
+  // bords de route
+  g.strokeStyle='#e9edf2'; g.lineWidth=2;
+  for(const s of [-1,1]){ g.beginPath();g.moveTo(cx+s*HALF,0);g.lineTo(cx+s*HALF,cy-HALF);g.moveTo(cx+s*HALF,cy+HALF);g.lineTo(cx+s*HALF,S);g.stroke();
+    g.beginPath();g.moveTo(0,cy+s*HALF);g.lineTo(cx-HALF,cy+s*HALF);g.moveTo(cx+HALF,cy+s*HALF);g.lineTo(S,cy+s*HALF);g.stroke(); }
+  // ligne centrale jaune tiretée
+  g.strokeStyle='#f2c94c'; g.lineWidth=3; g.setLineDash([16,14]);
+  g.beginPath();g.moveTo(cx,0);g.lineTo(cx,cy-HALF);g.moveTo(cx,cy+HALF);g.lineTo(cx,S);
+  g.moveTo(0,cy);g.lineTo(cx-HALF,cy);g.moveTo(cx+HALF,cy);g.lineTo(S,cy);g.stroke(); g.setLineDash([]);
+  // passages piétons (zébrures) + lignes d'arrêt
+  const ph=scenePhase();
+  for(const lane of LANES){const a=APP[lane];
+    g.fillStyle='#eef2f7';
+    if(a.axis==='v'){const y=a.cross-6; for(let x=cx-HALF+6;x<cx+HALF-6;x+=14) g.fillRect(x,y,7,12);
+      g.fillRect(cx-HALF, a.stop-(a.dir>0?4:0)-(a.dir<0?-0:0), HALF*2, 0);}
+    else{const x=a.cross-6; for(let y=cy-HALF+6;y<cy+HALF-6;y+=14) g.fillRect(x,y,12,7);}
+    // ligne d'arrêt
+    g.fillStyle='#dfe6ee';
+    if(a.axis==='v'){const y=a.stop+(a.dir>0?-6:2);g.fillRect(cx+(a.dir>0?-HALF:0),y,HALF,4);}
+    else{const x=a.stop+(a.dir>0?-6:2);g.fillRect(x,cy+(a.dir>0?-HALF:0),4,HALF);}
+  }
+  // véhicules (sauf ceux masqués par un piéton au même endroit — rendu piétons après)
+  for(const c of cars){const a=APP[c.appr];const coord=a.dir*c.s;
+    let x,y,w,h; if(a.axis==='v'){x=a.laneC;y=coord;w=CARW;h=CARLEN;}else{x=coord;y=a.laneC;w=CARLEN;h=CARW;}
+    const stopped=!carInIntersection(c)&&ph[c.appr]!=='green'&&(c.s+CARHALF)<=holdLimitS(c.appr)+2;
+    g.save();g.translate(x,y);
+    g.fillStyle=stopped?'#e8973a':c.color;
+    drawRoundRect(g,-w/2,-h/2,w,h,4);g.fill();
+    g.fillStyle='rgba(20,28,40,.55)';
+    if(a.axis==='v')g.fillRect(-w/2+2,a.dir>0?h/2-9:-h/2+3,w-4,6); else g.fillRect(a.dir>0?w/2-9:-w/2+3,-h/2+2,6,h-4);
+    g.restore();
+  }
+  // piétons en traversée (au-dessus des véhicules à l'arrêt)
+  for(const pd of peds){const p=pedXY(pd);
+    const waiting=pd.t<0.04;
+    g.fillStyle=waiting?'#d9b400':'#f1c40f'; g.beginPath();g.arc(p.x,p.y,waiting?3.2:4,0,7);g.fill();
+    if(!waiting){g.fillStyle='#7a5c00'; g.beginPath();g.arc(p.x,p.y-1,2,0,7);g.fill();}
+  }
+  // waiting pedestrians aux coins (nombre selon nb_pedestrians)
+  const st=sim.getState();
+  for(const lane of LANES){const a=APP[lane];const p=pairOf(st,'nb_pedestrians',lane);const n=p&&p[1]==='MANY'?4:2;
+    for(let i=0;i<n;i++){const ang=i*1.7; const px=a.corner[0]+(a.corner[0]<cx?-1:1)*(10+ (i%2)*9); const py=a.corner[1]+(a.corner[1]<cy?-1:1)*(10+((i>>1)%2)*9);
+      g.fillStyle='#d9b400';g.beginPath();g.arc(px,py,3.2,0,7);g.fill();}}
+  // feux tricolores
+  for(const lane of LANES) drawSignal(g,lane,ph[lane]);
+  // boussole
+  g.fillStyle='#cfd8e6';g.font='bold 13px system-ui';g.textAlign='center';
+  g.fillText('N',cx-LANE,16); g.fillText('S',cx+LANE,S-6); g.fillText('E',S-10,cy-LANE); g.fillText('O',10,cy+LANE);
+}
+function drawSignal(g,lane,state){
+  // position du boîtier près du coin d'arrivée
+  const pos={NORTH:[cx-HALF-30,cy-HALF-58],SOUTH:[cx+HALF+8,cy+HALF+10],EAST:[cx+HALF+10,cy-HALF-58],WEST:[cx-HALF-30,cy+HALF+10]}[lane];
+  const [x,y]=pos;
+  g.fillStyle='#11161f'; drawRoundRect(g,x,y,20,48,5); g.fill();
+  const bulbs=[['#e74c3c','red'],['#f1c40f','amber'],['#2ecc71','green']];
+  bulbs.forEach((b,i)=>{const on=(b[1]===state);g.beginPath();g.arc(x+10,y+9+i*15,6,0,7);
+    g.fillStyle=on?b[0]:'#2a2f3a';g.fill();
+    if(on){g.shadowColor=b[0];g.shadowBlur=12;g.fill();g.shadowBlur=0;}});
+}
+
+/* =======================================================================
+   4) PILOTE « CONTRÔLEUR » (mode auto) — ne déclenche que des évts activables
+   ======================================================================= */
+let autoOn=false, phaseClock=0, phaseTarget=8, tickClock=0, speed=1.1;
+const DURSECS={LONG:13,MEDIUM_DUR:9,SHORT:6,MINIMAL:4};
+function activeRep(){const st=sim.getState();return isGreen(st,'NORTH')?'NORTH':(isGreen(st,'EAST')?'EAST':null);}
+function computeTarget(){const rep=activeRep();if(!rep)return 6;const p=pairOf(sim.getState(),'green_duration',rep);
+  return DURSECS[p?p[1]:'SHORT']||6;}
+function fireByLabel(labels,pick){ // pick 'all' | 'one'
+  let en=sim.enabled().filter(t=>labels.some(L=>t.ev.label.startsWith(L)));
+  if(!en.length)return false;
+  if(pick==='all'){for(const t of en){sim.fire(t);}return true;}
+  const t=en[(Math.random()*en.length)|0]; sim.fire(t); logFire(t); return true;
+}
+function driverStep(){
+  // 1) avancer les chronomètres (TICK) des voies vertes
+  const ticks=sim.enabled().filter(t=>t.ev.label.startsWith('TICK'));
+  for(const t of ticks) sim.fire(t);
+  // 2) environnement : parfois un capteur
+  if(Math.random()<0.7){const se=sim.enabled().filter(t=>t.ev.label.startsWith('SENSE'));
+    if(se.length){const t=se[(Math.random()*se.length)|0];sim.fire(t);logFire(t);}}
+  // 3) réaction du contrôleur : règles floues activables
+  const fl=sim.enabled().filter(t=>t.ev.label.startsWith('FL'));
+  if(fl.length){const t=fl[(Math.random()*fl.length)|0];sim.fire(t);logFire(t);}
+  refreshPanels();
+}
+function doSwitch(){
+  const st=sim.getState();
+  const want = isGreen(st,'NORTH')?'SWITCH_to_EastWest':'SWITCH_to_NorthSouth';
+  let en=sim.enabled().filter(t=>t.ev.label===want);
+  if(!en.length){ // débloquer via règles floues puis réessayer
+    const fl=sim.enabled().filter(t=>t.ev.label.startsWith('FL')); if(fl.length){sim.fire(fl[0]);logFire(fl[0]);}
+    en=sim.enabled().filter(t=>t.ev.label===want);
+  }
+  if(en.length){sim.fire(en[0]);logFire(en[0]);}
+  phaseClock=0; phaseTarget=computeTarget(); refreshPanels();
+}
+
+/* =======================================================================
+   5) BOUCLE D'ANIMATION
+   ======================================================================= */
+let lastT=0, cardAcc=0, metricsAcc=0;
+function stepSim(dt){
+  const ph=scenePhase();
+  updateCars(dt,ph); updatePeds(dt,ph);
+  recordMetrics(dt,ph);
+  if(batchMode)tickBatch(dt);
+  if(autoOn){
+    phaseClock+=dt; tickClock+=dt;
+    if(tickClock>=1.0){tickClock=0; driverStep();}
+    if(phaseClock>=phaseTarget){ doSwitch(); }
+  }
+}
+function loop(ts){
+  if(!lastT)lastT=ts; let dt=(ts-lastT)/1000; lastT=ts; dt=Math.min(dt,0.05)*speed;
+  stepSim(dt); render();
+  cardAcc+=dt; if(cardAcc>0.2){cardAcc=0; updateLaneCards(); updatePhaseBar();}
+  metricsAcc+=dt; if(metricsAcc>0.35){metricsAcc=0; updateMetricsLive();}
+  requestAnimationFrame(loop);
+}
+
+/* =======================================================================
+   6) UI (cartes voies, phase, panneaux, contrôles)
+   ======================================================================= */
+let FILES=window.DEFAULT_FILES||{}, TRACE=window.DEFAULT_TRACE||'', CTX,MAC,sim,curMach,curPanel='events';
+
+function boot(){
+  const {ctx,mac}=parseRodin(FILES);CTX=ctx;MAC=mac;
+  const names=Object.keys(mac).sort();
+  curMach=names.includes('Traffic_M1')?'Traffic_M1':names[names.length-1];
+  renderMachTabs(names); loadMachine(curMach);
+}
+function renderMachTabs(names){const el=document.getElementById('machTabs');el.innerHTML='';
+  for(const n of names){const b=document.createElement('button');b.textContent=n;if(n===curMach)b.className='on';
+    b.onclick=()=>{curMach=n;[...el.children].forEach(c=>c.className=c.textContent===n?'on':'');loadMachine(n);};el.appendChild(b);}}
+function loadMachine(name){autoOn=false;setAutoBtn();
+  sim=Simulator(name,CTX,MAC);sim.reset();cars=[];peds=[];phaseClock=0;phaseTarget=computeTarget();
+  resetMetrics();spawnAcc={NORTH:0,SOUTH:0,EAST:0,WEST:0};pedAcc={NORTH:0,SOUTH:0,EAST:0,WEST:0};
+  logClear();log('<b>'+name+'</b> initialisée ('+sim.events.length+' événements, '+sim.invs.length+' invariants)');
+  buildLaneCards();refreshPanels();updateLaneCards();updatePhaseBar();updateMetricsLive();}
+
+function classify(l){return l.startsWith('SENSE')?'sensor':l.startsWith('SWITCH')?'switch':l.startsWith('TICK')?'tick':l.startsWith('FL')?'fuzzy':'';}
+function refreshPanels(){renderInvBanner();renderPanel();}
+
+function buildLaneCards(){const el=document.getElementById('lanes');el.innerHTML='';
+  for(const l of LANES){const d=document.createElement('div');d.className='lane';d.id='lane-'+l;el.appendChild(d);} }
+function updateLaneCards(){const st=sim.getState();const hasT=!!st.timer;
+  for(const l of LANES){const g=lanePhaseGreen(l);const rep=repOf(l);const di=durInfo(st,rep);const tm=timerOf(st,rep);
+    const el=document.getElementById('lane-'+l);if(!el)continue;
+    el.innerHTML=
+      `<div class="h"><span class="l" style="background:${g?'#2ecc71':'#e74c3c'};color:${g?'#2ecc71':'#e74c3c'}"></span>Voie ${FR[l]}
+         <span style="margin-left:auto;font-size:11px;color:${g?'#2ecc71':'#e74c3c'}">${g?'PASSANT':'ARRÊT'}</span></div>
+      <div class="row"><span>Feu</span><b style="color:${g?'#2ecc71':'#e74c3c'}">${g?'Vert':'Rouge'}</b></div>
+      <div class="row"><span>Trafic</span><b>${densTxt(st,'traffic_density',l)}</b></div>
+      <div class="row"><span>File d'attente</span><b>${queueCount(l)} véh.</b></div>
+      <div class="row"><span>Durée de vert</span><b>${di.txt}${di.sec?` (max ${di.sec}s)`:''}</b></div>
+      ${hasT&&tm!=null?`<div class="row"><span>Chrono</span><b>${tm}s${di.sec?` / ${di.sec}s`:''}</b></div>`:''}
+      <div class="row"><span>Piétons</span><b>${pedTxt(st,l)}</b></div>
+      <div class="row"><span>Priorité</span><b>${prioTxt(st,l)}</b></div>
+      <div class="row"><span>Attente</span><b>${waitTxt(st,l)}</b></div>`;
+  }
+}
+function updatePhaseBar(){const st=sim.getState();const rep=activeRep();
+  const nsGreen=isGreen(st,'NORTH');const phase=nsGreen?'Nord–Sud':(isGreen(st,'EAST')?'Est–Ouest':'—');
+  document.getElementById('phaseDot').style.background=rep?'#2ecc71':'#e74c3c';
+  document.getElementById('phaseTxt').textContent='Phase active : '+phase;
+  const tm=rep?timerOf(st,rep):null;
+  document.getElementById('phaseClock').textContent = autoOn
+    ? `vert ${phaseClock.toFixed(0)}s / ${phaseTarget}s`
+    : (tm!=null?`chrono modèle ${tm}s`:'—');
+}
+function renderInvBanner(){const inv=sim.checkInvariants();const bad=inv.filter(i=>i.ok===false);const unk=inv.filter(i=>i.ok===null);
+  const el=document.getElementById('invBanner');
+  if(bad.length){el.className='banner bad';el.innerHTML='✖ VIOLATION : '+bad.map(b=>'<span class="mono">'+b.label+'</span>').join(', ')+' — état impossible dans Rodin.';}
+  else{el.className='banner ok';el.innerHTML='✔ Tous les invariants tiennent ('+(inv.length-unk.length)+'/'+inv.length+') — conforme aux preuves RODIN.';}}
+
+/* panneaux droite */
+document.getElementById('panelTabs').addEventListener('click',e=>{if(e.target.dataset.p){curPanel=e.target.dataset.p;
+  [...e.currentTarget.children].forEach(c=>c.className=c.dataset.p===curPanel?'on':'');renderPanel();}});
+function renderPanel(){const el=document.getElementById('panel');
+  if(curPanel==='events')return renderEvents(el); if(curPanel==='state')return renderState(el);
+  if(curPanel==='inv')return renderInv(el); if(curPanel==='trace')return renderTrace(el); if(curPanel==='model')return renderModel(el);}
+let _cache=[];
+function renderEvents(el){const en=sim.enabled();_cache=en;
+  let h='<div class="hint">'+en.length+' transition(s) activable(s) — calculées par vos gardes.</div>';
+  if(!en.length)h+='<p class="inv-bad">Deadlock : aucun événement activable.</p>';
+  en.forEach((t,i)=>{const params=Object.keys(t.bound).length?' <span class="pill">'+Object.entries(t.bound).map(([k,v])=>k+'='+vshow(v)).join(', ')+'</span>':'';
+    h+=`<div class="evt ${classify(t.ev.label)}"><span class="nm">${t.ev.label}${params}</span><button data-i="${i}">exécuter ▶</button></div>`;});
+  el.innerHTML=h;el.querySelectorAll('[data-i]').forEach(b=>b.onclick=()=>{const t=_cache[+b.dataset.i];sim.fire(t);logFire(t);phaseTarget=computeTarget();refreshPanels();updateLaneCards();updatePhaseBar();});}
+function renderState(el){const st=sim.getState();let h='<table><tr><th>variable</th><th>valeur</th></tr>';
+  for(const v of sim.vars)h+='<tr><td class="mono">'+v+'</td><td class="mono">'+(st[v]?vshow(st[v]):'—')+'</td></tr>';
+  h+='</table><div class="hint">Constantes : '+Object.entries(sim.numConsts).map(([k,v])=>k+'='+v).join(', ')+'</div>';el.innerHTML=h;}
+function renderInv(el){const inv=sim.checkInvariants();let h='';
+  for(const i of inv){const dot=i.ok===false?'bad':'ok';const cls=i.ok===false?'inv-bad':(i.ok===null?'':'inv-ok');
+    h+=`<div class="inv-row"><span class="dot ${dot}"></span><div><div class="mono ${cls}">${i.label}${i.ok===null?' <span class="pill">non évalué</span>':''}</div><div class="hint mono">${esc(i.pred)}</div></div></div>`;}
+  el.innerHTML=h;}
+function renderModel(el){let h='<div class="hint">Machine <b>'+sim.flat.name+'</b>'+(sim.flat.refines?' raffine '+sim.flat.refines:'')+'</div>';
+  for(const ev of sim.events){h+='<div class="evt '+classify(ev.label)+'"><div style="flex:1"><div class="nm">'+ev.label+(ev.params.length?' <span class="pill">'+ev.params.join(', ')+'</span>':'')+'</div>';
+    if(ev.guards.length)h+='<div class="hint mono">WHEN '+ev.guards.map(esc).join(' ∧ ')+'</div>';
+    h+='<div class="hint mono">THEN '+ev.actions.map(a=>esc(a.asg)).join(' ‖ ')+'</div></div></div>';}el.innerHTML=h;}
+/* trace ProB */
+let traceObj=null,tracePos=0,traceMismatch=null;
+function renderTrace(el){let h='<div class="row" style="margin-bottom:8px"><button id="tLoad">Charger la trace ProB embarquée</button>'
+  +'<label class="tag" style="cursor:pointer">…ou un .prob2trace<input id="tFile" type="file" style="display:none"></label></div>'
+  +'<div class="hint">Rejouer la trace ProB : preuve que l\'animateur reproduit exactement les états de Rodin.</div>';
+  if(traceObj){h+='<div class="row" style="margin:10px 0"><button id="tReset">⟲</button><button id="tNext" class="primary">suivant ▶</button><button id="tAll">tout rejouer ⏭</button><span class="tag">pas '+tracePos+' / '+traceObj.transitionList.length+'</span></div>';
+    h+='<table><tr><th>#</th><th>transition</th></tr>';
+    traceObj.transitionList.forEach((tr,i)=>{h+='<tr><td>'+i+'</td><td class="mono" style="'+(i===tracePos-1?'color:#f1c40f;font-weight:700':(i<tracePos?'':'opacity:.5'))+'">'+tr.name+(tr.params?' ('+Object.entries(tr.params).map(([k,v])=>k+'='+v).join(', ')+')':'')+'</td></tr>';});
+    h+='</table>'; if(traceMismatch)h+='<div class="banner bad" style="margin-top:8px">✖ Divergence au pas '+traceMismatch+'.</div>';
+    else if(tracePos>0)h+='<div class="banner ok" style="margin-top:8px">✔ '+tracePos+' pas rejoués : identique à ProB.</div>';}
+  el.innerHTML=h;
+  const q=id=>el.querySelector('#'+id);
+  if(q('tLoad'))q('tLoad').onclick=()=>{loadTrace(TRACE);};
+  if(q('tFile'))q('tFile').onchange=e=>{const f=e.target.files[0];if(f)f.text().then(loadTrace);};
+  if(q('tReset'))q('tReset').onclick=()=>{traceReset();};
+  if(q('tNext'))q('tNext').onclick=()=>{traceStep();};
+  if(q('tAll'))q('tAll').onclick=()=>{while(tracePos<traceObj.transitionList.length&&!traceMismatch)traceStep();renderPanel();};}
+function loadTrace(t){try{traceObj=JSON.parse(t);}catch(e){alert('trace illisible');return;}traceReset();}
+function traceReset(){tracePos=0;traceMismatch=null;autoOn=false;setAutoBtn();sim.reset();cars=[];peds=[];refreshPanels();updateLaneCards();updatePhaseBar();if(curPanel==='trace')renderPanel();}
+function traceStep(){if(!traceObj||tracePos>=traceObj.transitionList.length)return;const tr=traceObj.transitionList[tracePos];
+  if(tr.name==='$setup_constants'||tr.name==='$initialise_machine'){tracePos++;if(curPanel==='trace')renderPanel();return;}
+  const en=sim.enabled();let cand=en.filter(t=>t.ev.label===tr.name);
+  if(tr.params)cand=cand.filter(t=>Object.entries(tr.params).every(([k,v])=>t.bound[k]&&vshow(t.bound[k])===v));
+  if(!cand.length){traceMismatch=tracePos;if(curPanel==='trace')renderPanel();return;}
+  sim.fire(cand[0]);logFire(cand[0]);tracePos++;refreshPanels();updateLaneCards();updatePhaseBar();if(curPanel==='trace')renderPanel();}
+
+/* contrôles */
+function setAutoBtn(){document.getElementById('btnAuto').textContent=autoOn?'⏸ Pause':'▶ Lancer la simulation';
+  document.getElementById('btnAuto').className=autoOn?'':'primary';}
+document.getElementById('btnAuto').onclick=()=>{autoOn=!autoOn;if(autoOn){phaseClock=0;phaseTarget=computeTarget();}setAutoBtn();};
+document.getElementById('btnReset').onclick=()=>{autoOn=false;setAutoBtn();sim.reset();cars=[];peds=[];
+  spawnAcc={NORTH:0,SOUTH:0,EAST:0,WEST:0};pedAcc={NORTH:0,SOUTH:0,EAST:0,WEST:0};
+  resetMetrics();phaseClock=0;log('⟲ réinitialisé');refreshPanels();updateLaneCards();updatePhaseBar();updateMetricsLive();};
+document.getElementById('btnStep').onclick=()=>{const en=sim.enabled();if(!en.length){log('⏹ deadlock');return;}
+  // un pas « intelligent » : TICK puis un évt aléatoire non-SWITCH
+  const t=en.filter(x=>!x.ev.label.startsWith('SWITCH'))[0]||en[0];sim.fire(t);logFire(t);phaseTarget=computeTarget();refreshPanels();updateLaneCards();updatePhaseBar();};
+document.getElementById('speed').oninput=e=>{speed=+e.target.value;};
+
+/* import */
+document.getElementById('folder').onchange=async e=>{const fs=[...e.target.files].filter(f=>/\.(buc|bum)$/.test(f.name));
+  if(!fs.length){alert('Aucun .buc/.bum trouvé.');return;}const nf={};for(const f of fs)nf[f.name.replace(/^.*\//,'')]=await f.text();
+  const tr=[...e.target.files].find(f=>f.name.endsWith('.prob2trace'));if(tr)TRACE=await tr.text();
+  FILES=nf;traceObj=null;document.getElementById('srcTag').textContent='source : '+fs.length+' fichiers importés ✔';
+  try{boot();log('<b>Fichiers importés</b> : '+Object.keys(nf).join(', '));}catch(err){alert('Erreur: '+err.message);}};
+
+/* log */
+function log(h){const d=document.createElement('div');d.innerHTML=h;const L=document.getElementById('log');L.appendChild(d);L.scrollTop=L.scrollHeight;
+  while(L.children.length>200)L.removeChild(L.firstChild);}
+function logFire(t){const params=Object.keys(t.bound).length?' ('+Object.entries(t.bound).map(([k,v])=>k+'='+vshow(v)).join(', ')+')':'';log('▶ <b>'+t.ev.label+'</b>'+params);}
+function logClear(){document.getElementById('log').innerHTML='';}
+function esc(s){return (s||'').replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));}
+
+/* init canvas + go */
+function initCanvas(){canvas=document.getElementById('scene');DPR=Math.min(window.devicePixelRatio||1,2);
+  canvas.width=S*DPR;canvas.height=S*DPR;ctx2d=canvas.getContext('2d');ctx2d.scale(DPR,DPR);}
+try{ initCanvas(); initScenarioUI(); boot(); if(/[?&]auto/.test(location.search)){autoOn=true;phaseClock=0;phaseTarget=computeTarget();setAutoBtn();}
+  const pm=location.search.match(/pre=(\d+)/); if(pm){for(let i=0;i<+pm[1];i++)stepSim(0.05);updateLaneCards();updatePhaseBar();}
+  requestAnimationFrame(loop); }
+catch(e){document.body.insertAdjacentHTML('beforeend','<pre style="color:#f88;padding:20px">'+e.stack+'</pre>');}
+</script>
+</body>
+</html>
