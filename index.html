@@ -86,6 +86,14 @@ d<!doctype html>
   .perf-actions{display:flex;flex-wrap:wrap;gap:8px;margin:10px 0}
   .batch-bar{height:6px;background:var(--panel2);border-radius:4px;overflow:hidden;margin:8px 0}
   .batch-bar i{display:block;height:100%;background:var(--accent);width:0;transition:width .2s}
+  .stats-pct{margin-top:14px;padding-top:12px;border-top:1px solid var(--line)}
+  .stats-pct h3{margin:0 0 8px;font-size:12px;text-transform:uppercase;letter-spacing:.4px;color:var(--muted);font-weight:600}
+  .stats-pct table{width:100%;font-size:11.5px}
+  .stats-pct th,.stats-pct td{padding:5px 6px;text-align:right}
+  .stats-pct th:first-child,.stats-pct td:first-child{text-align:left}
+  .stats-pct tr.global td{font-weight:700;border-top:2px solid var(--line);background:rgba(108,140,255,.06)}
+  .pct-bar{display:inline-block;height:6px;border-radius:3px;background:var(--accent);vertical-align:middle;margin-left:4px;max-width:48px}
+  .pct-high{color:#f1c40f} .pct-low{color:var(--green)}
 </style>
 </head>
 <body>
@@ -165,6 +173,21 @@ d<!doctype html>
     <div class="card">
       <h2>Statistiques par voie</h2>
       <div class="lanes" id="lanes"></div>
+      <div class="stats-pct">
+        <h3>Statistiques en pourcentage</h3>
+        <div class="hint" style="margin-bottom:8px">Part du temps simulé passé en attente, au rouge, et contribution de chaque voie à l'attente globale.</div>
+        <table id="lanePctTable">
+          <thead><tr>
+            <th>Voie</th>
+            <th>% attente véh.</th>
+            <th>% attente pié.</th>
+            <th>% rouge</th>
+            <th>Part att. véh.</th>
+            <th>Part att. pié.</th>
+          </tr></thead>
+          <tbody id="lanePctBody"></tbody>
+        </table>
+      </div>
       <div class="hint">Le modèle Rodin actionne une voie représentative par axe (Nord ↔ Sud, Est ↔ Ouest) ; durée de vert et chrono sont partagés par l'axe. Les variables brutes restent visibles dans l'onglet « État brut » en bas.</div>
     </div>
   </div>
@@ -355,8 +378,17 @@ const SCENARIOS={
     density:{NORTH:3.2,SOUTH:3.2,EAST:3.2,WEST:3.2},ped:{NORTH:2.5,SOUTH:2.5,EAST:2.5,WEST:2.5}},
 };
 let curScenario='balanced', scenarioResults={}, batchMode=null;
-const metrics={simTime:0,vehicleWaitTotal:0,pedWaitTotal:0,vehiclesSpawned:0,pedsSpawned:0};
-function resetMetrics(){metrics.simTime=0;metrics.vehicleWaitTotal=0;metrics.pedWaitTotal=0;metrics.vehiclesSpawned=0;metrics.pedsSpawned=0;}
+const emptyLaneAcc=()=>({NORTH:0,SOUTH:0,EAST:0,WEST:0});
+const metrics={simTime:0,vehicleWaitTotal:0,pedWaitTotal:0,vehiclesSpawned:0,pedsSpawned:0,
+  laneVehWait:emptyLaneAcc(),lanePedWait:emptyLaneAcc(),laneRed:emptyLaneAcc(),laneGreen:emptyLaneAcc(),
+  laneTimeVehQueue:emptyLaneAcc(),laneTimePedQueue:emptyLaneAcc()};
+function resetMetrics(){metrics.simTime=0;metrics.vehicleWaitTotal=0;metrics.pedWaitTotal=0;
+  metrics.vehiclesSpawned=0;metrics.pedsSpawned=0;
+  metrics.laneVehWait=emptyLaneAcc();metrics.lanePedWait=emptyLaneAcc();
+  metrics.laneRed=emptyLaneAcc();metrics.laneGreen=emptyLaneAcc();
+  metrics.laneTimeVehQueue=emptyLaneAcc();metrics.laneTimePedQueue=emptyLaneAcc();}
+function fmtPct(v,digits=1){return metrics.simTime>0?v.toFixed(digits)+' %':'—';}
+function pctBar(pct){const w=Math.min(100,Math.max(0,pct));return `<span class="pct-bar" style="width:${w*0.48}px"></span>`;}
 function scenarioCfg(){return SCENARIOS[curScenario]||SCENARIOS.balanced;}
 function pedInterval(st,lane){const p=pairOf(st,'nb_pedestrians',lane);
   const many=p&&p[1]==='MANY';const base=many?1.1:2.6;
@@ -366,8 +398,42 @@ function waitingPedCount(st,lane,ph){let n=0;
   if(ph[lane]==='red'&&!laneCrosswalkBlockedByCars(lane)){const p=pairOf(st,'nb_pedestrians',lane);n+=p&&p[1]==='MANY'?4:2;}
   return n;}
 function recordMetrics(dt,ph){const st=sim.getState();metrics.simTime+=dt;
-  for(const lane of LANES){metrics.vehicleWaitTotal+=dt*queueCount(lane);
-    metrics.pedWaitTotal+=dt*waitingPedCount(st,lane,ph);}}
+  for(const lane of LANES){
+    const qc=queueCount(lane), pc=waitingPedCount(st,lane,ph);
+    metrics.laneVehWait[lane]+=dt*qc; metrics.lanePedWait[lane]+=dt*pc;
+    if(qc>0)metrics.laneTimeVehQueue[lane]+=dt;
+    if(pc>0)metrics.laneTimePedQueue[lane]+=dt;
+    if(ph[lane]==='red')metrics.laneRed[lane]+=dt; else metrics.laneGreen[lane]+=dt;
+    metrics.vehicleWaitTotal+=dt*qc; metrics.pedWaitTotal+=dt*pc;}}
+function updateLanePctTable(){
+  const body=document.getElementById('lanePctBody'); if(!body)return;
+  const t=metrics.simTime, n=LANES.length;
+  if(t<=0){body.innerHTML='<tr><td colspan="6" class="hint" style="text-align:center;padding:10px">Lancez la simulation pour afficher les pourcentages.</td></tr>';return;}
+  let rows='';
+  for(const l of LANES){
+    const pctVeh=metrics.laneTimeVehQueue[l]/t*100;
+    const pctPed=metrics.laneTimePedQueue[l]/t*100;
+    const pctRed=metrics.laneRed[l]/t*100;
+    const partVeh=metrics.vehicleWaitTotal?metrics.laneVehWait[l]/metrics.vehicleWaitTotal*100:0;
+    const partPed=metrics.pedWaitTotal?metrics.lanePedWait[l]/metrics.pedWaitTotal*100:0;
+    const clsVeh=pctVeh>25?'pct-high':'pct-low';
+    rows+=`<tr><td>${FR[l]}</td>
+      <td class="${clsVeh}">${fmtPct(pctVeh)}${pctBar(pctVeh)}</td>
+      <td>${fmtPct(pctPed)}${pctBar(pctPed)}</td>
+      <td>${fmtPct(pctRed)}</td>
+      <td>${fmtPct(partVeh)}</td>
+      <td>${fmtPct(partPed)}</td></tr>`;
+  }
+  const globVeh=LANES.reduce((s,l)=>s+metrics.laneTimeVehQueue[l],0)/(t*n)*100;
+  const globPed=LANES.reduce((s,l)=>s+metrics.laneTimePedQueue[l],0)/(t*n)*100;
+  const globRed=LANES.reduce((s,l)=>s+metrics.laneRed[l],0)/(t*n)*100;
+  rows+=`<tr class="global"><td>Global (4 voies)</td>
+    <td class="${globVeh>25?'pct-high':'pct-low'}">${fmtPct(globVeh)}</td>
+    <td>${fmtPct(globPed)}</td>
+    <td>${fmtPct(globRed)}</td>
+    <td>100 %</td><td>100 %</td></tr>`;
+  body.innerHTML=rows;
+}
 function fmtSec(s){return s<10?s.toFixed(2):s<100?s.toFixed(1):Math.round(s).toLocaleString('fr-FR');}
 function snapshotMetrics(){return{simTime:metrics.simTime,vehicleWaitTotal:metrics.vehicleWaitTotal,pedWaitTotal:metrics.pedWaitTotal,
   vehiclesSpawned:metrics.vehiclesSpawned,pedsSpawned:metrics.pedsSpawned,
@@ -401,7 +467,7 @@ function initScenarioUI(){const sel=document.getElementById('scenarioSel');sel.i
 function updateScenarioDesc(){document.getElementById('scenarioDesc').textContent=scenarioCfg().desc;}
 function applyScenario(){autoOn=false;setAutoBtn();sim.reset();cars=[];peds=[];spawnAcc={NORTH:0,SOUTH:0,EAST:0,WEST:0};
   pedAcc={NORTH:0,SOUTH:0,EAST:0,WEST:0};resetMetrics();phaseClock=0;phaseTarget=computeTarget();
-  log('Scénario <b>'+SCENARIOS[curScenario].name+'</b> appliqué');refreshPanels();updateLaneCards();updatePhaseBar();updateMetricsLive();}
+  log('Scénario <b>'+SCENARIOS[curScenario].name+'</b> appliqué');refreshPanels();updateLaneCards();updateLanePctTable();updatePhaseBar();updateMetricsLive();}
 const BATCH_DURATION=45;
 function startBatchCompare(){if(batchMode)return;batchMode={idx:0,elapsed:0,ids:Object.keys(SCENARIOS)};
   autoOn=true;setAutoBtn();speed=2.5;document.getElementById('speed').value='2.5';
@@ -678,7 +744,7 @@ function stepSim(dt){
 function loop(ts){
   if(!lastT)lastT=ts; let dt=(ts-lastT)/1000; lastT=ts; dt=Math.min(dt,0.05)*speed;
   stepSim(dt); render();
-  cardAcc+=dt; if(cardAcc>0.2){cardAcc=0; updateLaneCards(); updatePhaseBar();}
+  cardAcc+=dt; if(cardAcc>0.2){cardAcc=0; updateLaneCards(); updateLanePctTable(); updatePhaseBar();}
   metricsAcc+=dt; if(metricsAcc>0.35){metricsAcc=0; updateMetricsLive();}
   requestAnimationFrame(loop);
 }
@@ -701,7 +767,7 @@ function loadMachine(name){autoOn=false;setAutoBtn();
   sim=Simulator(name,CTX,MAC);sim.reset();cars=[];peds=[];phaseClock=0;phaseTarget=computeTarget();
   resetMetrics();spawnAcc={NORTH:0,SOUTH:0,EAST:0,WEST:0};pedAcc={NORTH:0,SOUTH:0,EAST:0,WEST:0};
   logClear();log('<b>'+name+'</b> initialisée ('+sim.events.length+' événements, '+sim.invs.length+' invariants)');
-  buildLaneCards();refreshPanels();updateLaneCards();updatePhaseBar();updateMetricsLive();}
+  buildLaneCards();refreshPanels();updateLaneCards();updateLanePctTable();updatePhaseBar();updateMetricsLive();}
 
 function classify(l){return l.startsWith('SENSE')?'sensor':l.startsWith('SWITCH')?'switch':l.startsWith('TICK')?'tick':l.startsWith('FL')?'fuzzy':'';}
 function refreshPanels(){renderInvBanner();renderPanel();}
@@ -794,7 +860,7 @@ function setAutoBtn(){document.getElementById('btnAuto').textContent=autoOn?'⏸
 document.getElementById('btnAuto').onclick=()=>{autoOn=!autoOn;if(autoOn){phaseClock=0;phaseTarget=computeTarget();}setAutoBtn();};
 document.getElementById('btnReset').onclick=()=>{autoOn=false;setAutoBtn();sim.reset();cars=[];peds=[];
   spawnAcc={NORTH:0,SOUTH:0,EAST:0,WEST:0};pedAcc={NORTH:0,SOUTH:0,EAST:0,WEST:0};
-  resetMetrics();phaseClock=0;log('⟲ réinitialisé');refreshPanels();updateLaneCards();updatePhaseBar();updateMetricsLive();};
+  resetMetrics();phaseClock=0;log('⟲ réinitialisé');refreshPanels();updateLaneCards();updateLanePctTable();updatePhaseBar();updateMetricsLive();};
 document.getElementById('btnStep').onclick=()=>{const en=sim.enabled();if(!en.length){log('⏹ deadlock');return;}
   // un pas « intelligent » : TICK puis un évt aléatoire non-SWITCH
   const t=en.filter(x=>!x.ev.label.startsWith('SWITCH'))[0]||en[0];sim.fire(t);logFire(t);phaseTarget=computeTarget();refreshPanels();updateLaneCards();updatePhaseBar();};

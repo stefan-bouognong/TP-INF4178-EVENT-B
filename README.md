@@ -21,7 +21,8 @@ Aucune installation, aucun serveur.
   *Réinitialiser* remet à l'état initial, *1 pas* franchit un seul événement, la
   glissière règle la vitesse.
 - **Statistiques par voie** (panneau de droite) : état verbalisé de chaque voie (feu, trafic, file, durée de
-  vert, chrono, piétons, priorité, attente).
+  vert, chrono, piétons, priorité, attente) + **tableau en pourcentage** (% attente véhicules/piétons,
+  % feu rouge, part de l'attente globale par voie).
 - **Scénarios de trafic** : six profils prédéfinis (équilibré, axes chargés, piétons
   nombreux, heure de pointe, trafic faible). Choisir un scénario, *Appliquer*, puis
   *Lancer la simulation*.
